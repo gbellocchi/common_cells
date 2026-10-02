@@ -9,7 +9,8 @@
 // specific language governing permissions and limitations under the License.
 // SPDX-License-Identifier: SHL-0.51
 //
-// Author: Vatsal Dixit
+// Authors: Vatsal Dixit <vdixit@student.ethz.ch>
+//          Gianluca Bellocchi <gianluca.bellocchi@unimore.it>
 // Description: Combined QoS-priority + weighted-round-robin arbiter.
 
 `include "common_cells/registers.svh"
@@ -32,17 +33,17 @@
 ///   winner           = weighted round robin (by weights_i) among `eligible`   // cc_wrr_arbiter
 ///
 /// For all i, `age[i]` climbs by 1 every `AgingInterval` number of transfered flits
-/// while input `i` is requesting but *not* in the winning tier (i.e. held back due to low QoS); the aging 
-/// pauses once the input reaches the tier (where the weighted RR then guarantees its turn) and
-/// resets to 0 when granted. Counting grants rather than absolute clock cycles helps in preventing
-///  a downstream stall does not inflate the age[i].
+/// while input `i` is requesting but *not* in the winning tier (i.e. held back due to low QoS);
+/// the aging pauses once the input reaches the tier (where the weighted RR then guarantees its
+/// turn) and resets to 0 when granted. Counting grants rather than absolute clock cycles helps
+/// in preventing a downstream stall does not inflate the age[i].
 ///
 /// ## Design notes
 ///   Reuse `cc_wrr_arbiter` for the within-tier split. That cell already snapshots its
 ///   contender set and locks the winner for the burst, so the (continuously recomputed) `eligible`
 ///   mask can be fed to it directly; it re-evaluates the tier at each burst boundary.
 ///
-///   Weight 0 means no participation 
+///   Weight 0 means no participation
 ///
 ///   Aging only the QoS-blocked inputs (not the ones merely awaiting their weighted-RR turn)
 ///   Aging is counted per grant, not per clock (the prescaler advances only when a flit is
@@ -50,9 +51,9 @@
 
 module cc_qos_wrr_arbiter #(
   parameter int unsigned NumIn         = 4, /// Number of request ports to arbitrate.
-  parameter int unsigned DataWidth     = 32, /// Data width of the payload in bits. Not needed if `data_t` is overwritten.
+  parameter int unsigned DataWidth     = 32, /// Payload width in bits. Unused if `data_t` is set.
   parameter type         data_t        = logic [DataWidth-1:0], /// Data type of the payload.
-  parameter int unsigned QosWidth      = 4, /// Width of the per-input QoS level (AXI AxQOS is 4 bits).
+  parameter int unsigned QosWidth      = 4, /// Width of per-input QoS level (AXI AxQOS is 4 bits).
   parameter int unsigned WtWidth       = 4, /// Width of the per-input weight signal.
   parameter int unsigned AgeWidth      = 4, /// Width of the per-input aging counter.
 
@@ -71,10 +72,12 @@ module cc_qos_wrr_arbiter #(
   input  logic    [NumIn-1:0]             req_i,
   output logic    [NumIn-1:0]             gnt_o,
   input  data_t   [NumIn-1:0]             data_i,
- 
-  input  logic    [NumIn-1:0][QosWidth-1:0] qos_i,  // Per-input QoS level (priority); higher is served first.
-  input  logic    [NumIn-1:0][WtWidth-1:0]  weights_i,  // Per-input weight; splits a tier's bandwidth. A weight of 0 excludes the input.
-  
+
+  // Per-input QoS level (priority); higher is served first.
+  input  logic    [NumIn-1:0][QosWidth-1:0] qos_i,
+  // Per-input weight; splits a tier's bandwidth. A weight of 0 excludes the input.
+  input  logic    [NumIn-1:0][WtWidth-1:0]  weights_i,
+
   output logic                            req_o,
   input  logic                            gnt_i,
   output data_t                           data_o,
@@ -93,8 +96,8 @@ module cc_qos_wrr_arbiter #(
   logic                flit_transfer;
   assign flit_transfer = req_o & gnt_i;  // a flit is actually granted (forward progress) this cycle
   // tick is high means AgingInterval number of grants have completed
-  assign tick          = flit_transfer &
-                         ((AgingInterval <= 1) ? 1'b1 : (gnt_cnt_q == GntCntWidth'(AgingInterval - 1)));
+  assign tick          = flit_transfer & ((AgingInterval <= 1) ? 1'b1 :
+                         (gnt_cnt_q == GntCntWidth'(AgingInterval - 1)));
   assign gnt_cnt_d         = ~flit_transfer ? gnt_cnt_q : (tick ? '0 : (gnt_cnt_q + 1'b1));
 
   `FFARNC(gnt_cnt_q, gnt_cnt_d, flush_i, '0, clk_i, rst_ni)
@@ -115,14 +118,14 @@ module cc_qos_wrr_arbiter #(
   // A weight-0 input gets no service, so its masked out
 
   always_comb begin : proc_arb_req
-    for (int unsigned i = 0; i < NumIn; i++) 
+    for (int unsigned i = 0; i < NumIn; i++)
       arb_req[i] = req_i[i] & (weights_i[i] != '0);
   end
 
   always_comb begin : proc_tier
     max_eff = '0;
     for (int unsigned i = 0; i < NumIn; i++) begin
-      if (arb_req[i] && (eff_qos[i] > max_eff)) 
+      if (arb_req[i] && (eff_qos[i] > max_eff))
         max_eff = eff_qos[i];
     end
     for (int unsigned i = 0; i < NumIn; i++) begin
@@ -161,11 +164,12 @@ module cc_qos_wrr_arbiter #(
   always_comb begin : proc_age
     for (int unsigned i = 0; i < NumIn; i++) begin
       if (gnt_o[i] || !arb_req[i]) begin
-        age_d[i] = '0;                                              // served, idle, or weight 0
+        age_d[i] = '0;                       // served, idle, or weight 0
       end else if (eligible[i]) begin
-        age_d[i] = age_q[i];                                        // in winning tier, no need to age
+        age_d[i] = age_q[i];                 // in winning tier, no need to age
       end else if (tick) begin
-        age_d[i] = (age_q[i] == '1) ? age_q[i] : (age_q[i] + 1'b1); // is the counter already at its max? QoS-blocked -> age (saturate)
+        // QoS-blocked -> age, saturating once the counter is already at its max
+        age_d[i] = (age_q[i] == '1) ? age_q[i] : (age_q[i] + 1'b1);
       end else begin
         age_d[i] = age_q[i];
       end

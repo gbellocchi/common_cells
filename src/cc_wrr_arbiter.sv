@@ -9,7 +9,8 @@
 // specific language governing permissions and limitations under the License.
 // SPDX-License-Identifier: SHL-0.51
 //
-// Author: Vatsal Dixit
+// Authors: Vatsal Dixit <vdixit@student.ethz.ch>
+//          Gianluca Bellocchi <gianluca.bellocchi@unimore.it>
 // Description: Weighted round-robin (WRR) arbiter.
 
 `include "common_cells/registers.svh"
@@ -118,11 +119,11 @@ module cc_wrr_arbiter #(
   logic [WtWidth-1:0]   sel_weight;             // weight of the current winner (always >= 1)
 
   logic                 load_round;             // (re)load snapshot + weight for a fresh burst
-  logic                 flit_transfered;             // one accepted transfer (flit) from the current winner
+  logic                 flit_transfered;        // one accepted transfer (flit) from current winner
   logic                 last_flit;              // this flit is the last of the current burst
   logic                 burst_done;             // last flit accepted -> advance the rr pointer
-  logic                 winner_gone;            // locked winner stopped requesting (e.g. QoS-masked)
-  logic                 round_end;              // burst finished OR winner abandoned -> re-arbitrate
+  logic                 winner_gone;            // locked winner quit requesting (e.g. QoS-masked)
+  logic                 round_end;              // burst done OR winner abandoned -> re-arbitrate
 
   // A weight of 0 means "no bandwidth": that input is excluded from arbitration entirely (skipped,
   // never granted) instead of being served. Only requesting inputs with a non-zero weight contend,
