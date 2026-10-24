@@ -1,17 +1,17 @@
 onerror {resume}
 quietly WaveActivateNextPane {} 0
 
-# Testbench-level signals (req/gnt, weights, output handshake, idx, data)
-add wave -noupdate -group {tb} {/cc_wrr_arbiter_tb/*}
+# Testbench-level signals (phase, req/gnt, QoS, weights, output handshake, idx, data)
+add wave -noupdate -group {tb} {/cc_qos_wrr_arbiter_tb/*}
 
-# DUT internals: the weighted round-robin mechanism.
-#  - winner_idx / req_lock_q : who is being served and the locked contender snapshot
-#  - sel_weight / cnt_eff / cnt_q : the burst counter (remaining flits in the burst)
-#  - load_round / flit / last_flit / burst_done : burst boundary control
-add wave -noupdate -group {dut} {/cc_wrr_arbiter_tb/i_dut/*}
+# QoS stage: aging counters, effective QoS and the winning tier.
+add wave -noupdate -group {qos} {/cc_qos_wrr_arbiter_tb/i_dut/*}
+
+# Weighted round-robin stage: burst counter and contender snapshot.
+add wave -noupdate -group {wrr} {/cc_qos_wrr_arbiter_tb/i_dut/i_cc_wrr_arbiter/*}
 
 # Inner fair round-robin tree used purely as a winner picker.
-add wave -noupdate -group {inner_rr} {/cc_wrr_arbiter_tb/i_dut/i_cc_rr_arb_tree/*}
+add wave -noupdate -group {inner_rr} {/cc_qos_wrr_arbiter_tb/i_dut/i_cc_wrr_arbiter/i_cc_rr_arb_tree/*}
 
 TreeUpdate [SetDefaultTree]
 WaveRestoreCursors {{Cursor 1} {0 ns} 0}
