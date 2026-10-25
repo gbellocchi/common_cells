@@ -54,7 +54,7 @@ module cc_id_queue #(
     parameter bit          CutOupPopInpGnt = 0,
     parameter int unsigned NumCmpPorts     = 1,
     parameter type         data_t          = logic[31:0],
-    // Dependent parameters, DO NOT OVERRIDE!
+    // Dependent parameter, DO NOT OVERRIDE!
     localparam type        id_t            = logic[IdWidth-1:0]
 ) (
     input  logic    clk_i,
