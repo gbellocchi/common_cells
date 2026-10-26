@@ -122,9 +122,9 @@ module cc_wrr_arbiter #(
     .idx_o   ( winner_idx   )
   );
 
-  ///////////////////////////////
-  // Output handshake and data //
-  ///////////////////////////////
+  ////////////////////
+  // Output control //
+  ////////////////////
   // Guard the output index when no input requests.
   assign idx_o  = any_req ? winner_idx : '0;
   assign req_o  = any_req ? req_i[idx_o] : 1'b0;
